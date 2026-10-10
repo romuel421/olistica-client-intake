@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Olistica Nail Salon and Body Spa — Client Intake Data Store</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  :root{
+    --gold:#c9a24b; --gold-d:#a8843a; --ink:#2b2b2b; --paper:#faf7f0;
+    --line:#d8cfbc; --ok:#2e7d32; --warn:#b26a00; --bad:#b3261e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Georgia,'Times New Roman',serif;background:#efe9dc;color:var(--ink)}
+  header{background:#1f1b14;color:var(--gold);padding:14px 24px;border-bottom:4px solid var(--gold);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  header h1{font-size:20px;margin:0;letter-spacing:3px}
+  header .sub{font-size:12px;color:#cbb877;letter-spacing:1px}
+  #hdrAuth{display:none;gap:8px;align-items:center}
+  #hdrUser{color:#cbb877;font-size:13px}
+  .hdr-btn{padding:7px 14px;border:1.5px solid var(--gold);background:transparent;color:var(--gold);border-radius:5px;cursor:pointer;font-weight:bold;font-size:12px;letter-spacing:.5px;font-family:inherit}
+  .hdr-btn:hover{background:var(--gold);color:#1f1b14}
+  .wrap{max-width:1050px;margin:0 auto;padding:20px}
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tab{padding:10px 20px;border:1px solid var(--gold);background:#fff;color:var(--gold-d);cursor:pointer;border-radius:6px 6px 0 0;font-weight:bold;letter-spacing:1px}
+  .tab.active{background:var(--gold);color:#1f1b14}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:20px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+  h2{border-bottom:2px solid var(--gold);padding-bottom:6px;font-size:17px;letter-spacing:2px;color:var(--gold-d)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+  label{font-size:12px;font-weight:bold;color:#6b5d3f;display:block;margin-bottom:4px;letter-spacing:.5px}
+  input[type=text],input[type=tel],input[type=date],input[type=time],input[type=password],select,textarea{
+    width:100%;padding:8px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:14px;font-family:inherit}
+  textarea{min-height:90px}
+  .full-row{grid-column:1/-1}
+  .multi-row{display:flex;gap:8px;margin-bottom:8px}
+  .multi-row input{flex:1}
+  .row-del{background:#fff;border:1.5px solid var(--bad);color:var(--bad);border-radius:5px;cursor:pointer;width:38px;font-size:14px}
+  .add-row-btn{padding:7px 14px;border:1.5px dashed var(--gold);background:#fffdf6;color:var(--gold-d);border-radius:5px;cursor:pointer;font-weight:bold;font-size:12px;font-family:inherit}
+  .add-row-btn:hover{background:var(--gold);color:#1f1b14}
+  .entry-modes{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .mode-btn{padding:10px 16px;border:2px solid var(--gold);background:#fff;border-radius:6px;cursor:pointer;font-weight:bold;color:var(--gold-d)}
+  .mode-btn.active{background:var(--gold);color:#1f1b14}
+  #photoArea{display:none;border:2px dashed var(--gold);border-radius:8px;padding:16px;text-align:center;background:#fffdf6}
+  #ocrStatus{font-size:13px;color:var(--warn);margin-top:8px}
+  #foundBanner{display:none;background:#e8f3e8;border:1px solid var(--ok);color:var(--ok);padding:10px 14px;border-radius:6px;margin-bottom:14px;font-weight:bold}
+  #recordList{display:grid;gap:10px}
+  .rec-item{background:#fff;border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:6px;padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+  .rec-item:hover{background:#fffaf0}
+  .rec-item .nm{font-weight:bold;font-size:16px}
+  .rec-item .meta{font-size:12px;color:#7a6c4e}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+  th{background:var(--gold);color:#1f1b14;padding:8px;text-align:left;white-space:nowrap}
+  td{padding:7px 8px;border-bottom:1px solid var(--line)}
+  .search-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .search-row input{flex:1;min-width:220px}
+  #detailView{display:none}
+  .small{font-size:12px;color:#7a6c4e}
+  .row-flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
+  .btn{padding:10px 22px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px;letter-spacing:1px;font-family:inherit}
+  .btn-gold{background:var(--gold);color:#1f1b14}
+  .btn-gold:hover{background:var(--gold-d);color:#fff}
+  .btn-line{background:#fff;border:1.5px solid var(--gold);color:var(--gold-d)}
+  .btn-danger{background:var(--bad);color:#fff}
+  .t-del{background:none;border:none;color:var(--bad);font-size:16px;cursor:pointer}
+  .login-card{max-width:420px;margin:50px auto}
+  #loginErr{color:var(--bad);font-size:13px;font-weight:bold;min-height:18px}
+  .persist-note{background:#e8f3e8;border:1px solid var(--ok);color:#2e5d31;padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:14px;line-height:1.5}
+  .persist-warn{background:#fdf3e0;border:1px solid var(--warn);color:#7a4a00;padding:8px 14px;border-radius:6px;font-size:12px;margin-top:10px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>✦ OLISTICA</h1>
+    <div class="sub">NAIL SALON AND BODY SPA — CLIENT INTAKE DATA STORE</div>
+  </div>
+  <div id="hdrAuth">
+    <span id="hdrUser"></span>
+    <button class="hdr-btn" onclick="changePassword()">🔑 Change Password</button>
+    <button class="hdr-btn" onclick="logout()">🚪 Logout</button>
+  </div>
+</header>
+
+<!-- ============ LOGIN (public website protection) ============ -->
+<div class="wrap" id="loginView">
+  <div class="card login-card">
+    <h2>STAFF LOGIN</h2>
+    <p class="small">This data store is private. Please log in with your staff account.</p>
+    <div style="margin-bottom:12px"><label>STAFF EMAIL</label><input type="email" id="l_user" autocomplete="username" required></div>
+    <div style="margin-bottom:12px"><label>PASSWORD</label><input type="password" id="l_pass" autocomplete="current-password"></div>
+    <div id="loginErr"></div>
+    <button class="btn btn-gold" style="width:100%" onclick="doLogin()">🔓 LOG IN</button>
+    <p class="small" style="margin-top:14px">Accounts are created by an administrator only. Contact your Olistica administrator if you need access.</p>
+  </div>
+</div>
+
+<!-- ============ APP (visible only after login) ============ -->
+<div class="wrap" id="appView" style="display:none">
+  <div id="adminPanel" class="card" style="display:none;margin-bottom:18px">
+    <h2>ADMIN — STAFF ACCOUNTS</h2>
+    <p class="small">Only administrators can create staff accounts. Staff accounts cannot self-register.</p>
+    <div class="grid">
+      <div><label>STAFF EMAIL</label><input type="email" id="staffEmail" autocomplete="off" placeholder="staff@example.com"></div>
+      <div><label>TEMPORARY PASSWORD (at least 10 characters)</label><input type="password" id="staffPassword" autocomplete="new-password" minlength="10" placeholder="Temporary password"></div>
+    </div>
+    <div class="row-flex"><button class="btn btn-gold" onclick="createStaff()">＋ Create Staff Account</button><span id="staffMsg" class="small" role="status"></span></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabForm" onclick="switchTab('form')">＋ New Intake</div>
+    <div class="tab" id="tabRecords" onclick="switchTab('records')">📋 Client Records</div>
+  </div>
+
+  <!-- ============ INTAKE FORM ============ -->
+  <div id="viewForm" class="card">
+    <h2>CLIENT INTAKE FORM</h2>
+    <div class="entry-modes">
+      <button class="mode-btn active" id="btnManual" onclick="setMode('manual')">✍️ Type Manually</button>
+      <button class="mode-btn" id="btnPhoto" onclick="setMode('photo')">📷 Fill from Picture (OCR)</button>
+    </div>
+
+    <div id="photoArea">
+      <p class="small">Take a photo or upload the filled-out paper intake form. Text will be extracted — review it, then apply to the form below.</p>
+      <input type="file" id="photoInput" accept="image/*" capture="environment">
+      <div id="ocrStatus"></div>
+      <div id="ocrResult" style="display:none;margin-top:12px;text-align:left">
+        <label>Extracted text (editable):</label>
+        <textarea id="ocrText"></textarea>
+        <div class="row-flex">
+          <button class="btn btn-line" onclick="applyOCR()">⚡ Auto-Fill Form From Text</button>
+          <button class="btn btn-line" onclick="copyOCRField('phone')">Grab Phone #</button>
+          <button class="btn btn-line" onclick="copyOCRField('date')">Grab Date</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="foundBanner">✔ Existing client detected — record loaded. This visit will be added to their history.</div>
+
+    <div class="grid">
+      <div><label>DATE</label><input type="date" id="f_date"></div>
+      <div><label>CIF #</label><input type="text" id="f_cif" placeholder="CIF #"></div>
+      <div style="grid-column:span 2;position:relative">
+        <label>NAME *</label>
+        <input type="text" id="f_name" placeholder="Client name (type to search records)" autocomplete="off">
+        <div id="nameSuggest" style="position:absolute;z-index:9;background:#fff;border:1px solid var(--line);width:100%;max-height:160px;overflow:auto;display:none;border-radius:0 0 6px 6px"></div>
+      </div>
+      <div><label>PHONE</label><input type="tel" id="f_phone" placeholder="Phone"></div>
+      <div><label>HOTEL GUEST (if yes, hotel name)</label><input type="text" id="f_hotel" placeholder="Hotel name or leave blank"></div>
+      <div>
+        <label>APPOINTMENT</label>
+        <select id="f_appt"><option value="Walk-in">Walk-in</option><option value="Booked">Booked Appointment</option></select>
+      </div>
+      <div><label>START TIME</label><input type="time" id="f_start"></div>
+      <div><label>END TIME</label><input type="time" id="f_end"></div>
+
+      <!-- THERAPIST(S): add as many as needed -->
+      <div class="full-row">
+        <label>THERAPIST(S)</label>
+        <div id="therapistRows"></div>
+        <button class="add-row-btn" onclick="addRow('therapist')">＋ Add Therapist</button>
+      </div>
+
+      <!-- SERVICE(S): add as many as needed -->
+      <div class="full-row">
+        <label>SERVICE(S)</label>
+        <div id="serviceRows"></div>
+        <button class="add-row-btn" onclick="addRow('service')">＋ Add Service</button>
+      </div>
+    </div>
+
+    <div class="row-flex" style="margin-top:18px">
+      <button class="btn btn-gold" onclick="saveIntake()">💾 SAVE TO CLIENT RECORD</button>
+      <button class="btn btn-line" onclick="resetForm()">Clear Form</button>
+      <span id="saveMsg" class="small"></span>
+    </div>
+    <p class="small">✔ Records are saved to the shared online database. Access requires an authorized staff account and an internet connection.</p>
+  </div>
+
+  <!-- ============ RECORDS ============ -->
+  <div id="viewRecords" class="card" style="display:none">
+    <h2>CLIENT RECORDS</h2>
+
+    <div class="persist-note">
+      ✔ Client records are stored in the shared Supabase database and are available to authorized staff across devices. Keep separate JSON backups as an additional recovery measure.
+    </div>
+
+    <div class="search-row">
+      <input type="text" id="recSearch" placeholder="🔍 Type client name to search records..." oninput="renderRecords()">
+      <button class="btn btn-line" onclick="document.getElementById('recSearch').value='';renderRecords()">Show All</button>
+    </div>
+    <div class="row-flex">
+      <button class="btn btn-gold" onclick="exportDoc()">⬇️ Backup All Data (Word document)</button>
+      <button class="btn btn-line" onclick="exportData()">⬇️ Backup (JSON file)</button>
+      <button class="btn btn-line" onclick="document.getElementById('importFile').click()">⬆️ Restore Backup (JSON)</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+    <div id="recordList"></div>
+
+    <div id="detailView">
+      <h2 id="dName" style="margin-top:24px"></h2>
+      <div id="dInfo" class="small" style="margin-bottom:12px"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>CIF #</th><th>Appointment</th><th>Time</th><th>Therapist(s)</th><th>Service(s)</th><th></th></tr></thead>
+          <tbody id="dVisits"></tbody>
+        </table>
+      </div>
+      <div class="row-flex" style="margin-top:14px">
+        <button class="btn btn-gold" onclick="addVisitToClient()">＋ Add New Visit (from Intake Form)</button>
+        <button class="btn btn-danger" onclick="deleteClient()">Delete This Client</button>
+        <button class="btn btn-line" onclick="closeDetail()">Close</button>
+      </div>
+      <p class="small">Tip: click "Add New Visit" to jump to the intake form — the client's name, phone and hotel will load automatically. Just enter the new date and details, then save.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= SUPABASE CONFIGURATION =================
+   Set these two values from Supabase Project Settings > API.
+   The publishable/anon key is intended for browser use; NEVER put a service-role key here.
+*/
+const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';
+const sbConfigured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL) && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE');
+const supabase = sbConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
+let clients = {};
+let auth = null;
+let currentUser = null;
+let currentRole = 'staff';
+let detailKey = null;
+const normalizeKey = s => String(s || '').trim().toLowerCase();
+function escapeHtml(value){return String(value==null?'':value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function requireConfigured(){ if(!supabase){ alert('Supabase is not configured yet. Edit SUPABASE_URL and SUPABASE_ANON_KEY near the top of the script, then publish again.'); return false; } return true; }
+function dbError(err, fallback='Database request failed.'){ console.error(err); return err?.message || fallback; }
+async function loadClients(){
+  if(!supabase || !currentUser) return {};
+  const { data, error } = await supabase.from('client_records').select('client_key,record');
+  if(error) throw error;
+  const out = {};
+  for(const row of (data || [])) out[row.client_key] = row.record;
+  return out;
+}
+async function saveClient(key){
+  const { error } = await supabase.from('client_records').upsert({client_key:key, record:clients[key], updated_at:new Date().toISOString()}, {onConflict:'client_key'});
+  if(error) throw error;
+}
+async function removeClientFromDb(key){
+  const { error } = await supabase.from('client_records').delete().eq('client_key',key);
+  if(error) throw error;
+}
+async function replaceAllClients(next){
+  const oldKeys = Object.keys(clients);
+  const newKeys = Object.keys(next);
+  const rows = newKeys.map(key=>({client_key:key,record:next[key],updated_at:new Date().toISOString()}));
+  if(rows.length){ const {error}=await supabase.from('client_records').upsert(rows,{onConflict:'client_key'}); if(error) throw error; }
+  const removed=oldKeys.filter(k=>!Object.prototype.hasOwnProperty.call(next,k));
+  for(const key of removed) await removeClientFromDb(key);
+  clients=next;
+}
+
+/* ================= AUTHENTICATION ================= */
+async function doLogin(){
+  if(!requireConfigured()) return;
+  const email=document.getElementById('l_user').value.trim().toLowerCase();
+  const password=document.getElementById('l_pass').value;
+  const errEl=document.getElementById('loginErr'); errEl.textContent='Signing in…';
+  const {data,error}=await supabase.auth.signInWithPassword({email,password});
+  if(error){errEl.textContent='⚠ Sign-in failed. Check your email and password.';return;}
+  currentUser=data.user;
+  await finishLogin();
+}
+async function finishLogin(){
+  try{
+    const {data:profile,error:pErr}=await supabase.from('profiles').select('role').eq('id',currentUser.id).single();
+    if(pErr) throw pErr;
+    currentRole=profile?.role==='admin'?'admin':'staff';
+    clients=await loadClients();
+    showApp();
+  }catch(e){
+    console.error(e); document.getElementById('loginErr').textContent='⚠ Could not load your profile or records. Confirm the Supabase SQL setup and permissions.';
+    await supabase.auth.signOut(); currentUser=null;
+  }
+}
+async function logout(){
+  if(!confirm('Log out of the data store?'))return;
+  if(supabase) await supabase.auth.signOut();
+  location.reload();
+}
+function showApp(){
+  document.getElementById('loginView').style.display='none';
+  document.getElementById('appView').style.display='block';
+  document.getElementById('hdrAuth').style.display='flex';
+  document.getElementById('hdrUser').textContent='👤 '+(currentUser?.email||'Staff')+(currentRole==='admin'?' · ADMIN':'');
+  document.getElementById('adminPanel').style.display=currentRole==='admin'?'block':'none';
+  renderRecords();
+  if(window._olisticaChannel) supabase.removeChannel(window._olisticaChannel);
+  window._olisticaChannel=supabase.channel('olistica-client-records').on('postgres_changes',{event:'*',schema:'public',table:'client_records'},async()=>{
+    try { clients=await loadClients(); renderRecords(); if(detailKey && clients[detailKey]) openDetail(detailKey); } catch(e){ console.warn('Live refresh failed',e); }
+  }).subscribe();
+}
+async function changePassword(){
+  if(!requireConfigured())return;
+  const nw=prompt('New password (minimum 10 characters):');if(nw===null)return;
+  if(nw.length<10){alert('Password too short — use at least 10 characters.');return;}
+  const nw2=prompt('Repeat new password:');if(nw2===null)return;
+  if(nw2!==nw){alert('Passwords do not match.');return;}
+  const {error}=await supabase.auth.updateUser({password:nw});
+  if(error){alert('Password update failed: '+error.message);return;}
+  alert('✔ Password changed successfully.');
+}
+async function createStaff(){
+  if(currentRole!=='admin'){alert('Only an administrator can create staff accounts.');return;}
+  const email=document.getElementById('staffEmail').value.trim().toLowerCase();
+  const password=document.getElementById('staffPassword').value;
+  const msg=document.getElementById('staffMsg');
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){msg.textContent='Enter a valid email address.';return;}
+  if(password.length<10){msg.textContent='Use a temporary password of at least 10 characters.';return;}
+  msg.textContent='Creating account…';
+  const {data,error}=await supabase.functions.invoke('create-staff',{body:{email,password}});
+  if(error || data?.error){msg.textContent='Could not create account: '+(data?.error||error?.message||'Unknown error');return;}
+  msg.textContent='✔ Staff account created for '+email+'.';
+  document.getElementById('staffEmail').value='';document.getElementById('staffPassword').value='';
+}
+
+/* ================= MODE: manual / photo ================= */
+function setMode(m){
+  document.getElementById('btnManual').classList.toggle('active',m==='manual');
+  document.getElementById('btnPhoto').classList.toggle('active',m==='photo');
+  document.getElementById('photoArea').style.display=m==='photo'?'block':'none';
+}
+document.getElementById('photoInput').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const st=document.getElementById('ocrStatus');
+  st.textContent='⏳ Reading picture... please wait (first run may download language data).';
+  try{
+    const res=await Tesseract.recognize(file,'eng');
+    document.getElementById('ocrText').value=res.data.text||'(no text found)';
+    document.getElementById('ocrResult').style.display='block';
+    st.textContent='✔ Done — review the text below, then auto-fill.';
+  }catch(err){
+    st.textContent='⚠ OCR failed (needs internet for first use). You can still type manually.';
+  }
+});
+function applyOCR(){
+  const t=document.getElementById('ocrText').value;
+  const phone=t.match(/(\+?\d[\d\s-]{7,}\d)/);
+  if(phone)document.getElementById('f_phone').value=phone[1].trim();
+  const date=t.match(/(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);
+  if(date){const p=date[1].split(/[\/\-.]/);if(p[2].length===4)document.getElementById('f_date').value=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}
+  const times=t.match(/\b([01]?\d:[0-5]\d)\b/g);
+  if(times){if(times[0])document.getElementById('f_start').value=times[0];if(times[1])document.getElementById('f_end').value=times[1];}
+  const lines=t.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length)document.getElementById('f_name').value=lines[0].slice(0,60);
+  document.getElementById('saveMsg').textContent='Auto-fill applied — please verify each field.';
+}
+function copyOCRField(which){
+  const t=document.getElementById('ocrText').value;
+  if(which==='phone'){const m=t.match(/(\+?\d[\d\s-]{7,}\d)/);if(m)document.getElementById('f_phone').value=m[1].trim();}
+  if(which==='date'){const m=t.match(/(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);if(m){const p=m[1].split(/[\/\-.]/);if(p[2].length===4)document.getElementById('f_date').value=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}}
+}
+
+/* ================= MULTI-ENTRY: THERAPIST(S) & SERVICE(S) ================= */
+function addRow(kind,val=''){
+  const wrap=document.getElementById(kind+'Rows');
+  const row=document.createElement('div');
+  row.className='multi-row';
+  row.innerHTML=`<input type="text" placeholder="${kind==='therapist'?'Therapist name':'Service name'}" value="${escapeHtml(val)}">
+    <button class="row-del" onclick="this.parentNode.remove()" title="Remove">✕</button>`;
+  wrap.appendChild(row);
+}
+function collectRows(kind){
+  return [...document.querySelectorAll('#'+kind+'Rows input')].map(i=>i.value.trim()).filter(Boolean);
+}
+function resetRows(){
+  document.getElementById('therapistRows').innerHTML='';
+  document.getElementById('serviceRows').innerHTML='';
+  addRow('therapist');
+  addRow('service');
+}
+
+/* ================= NAME AUTO-DETECT ================= */
+const fName=document.getElementById('f_name'), sug=document.getElementById('nameSuggest');
+let loadedClientKey=null;
+fName.addEventListener('input',()=>{
+  const q=fName.value.trim().toLowerCase();
+  loadedClientKey=null;
+  document.getElementById('foundBanner').style.display='none';
+  if(q.length<2){sug.style.display='none';return;}
+  const matches=Object.keys(clients).filter(k=>k.includes(q)).slice(0,6);
+  if(!matches.length){sug.style.display='none';return;}
+  sug.innerHTML=matches.map(k=>`<div style="padding:8px;cursor:pointer" onmousedown="pickClient(decodeURIComponent('${encodeURIComponent(k)}'))">${escapeHtml(clients[k].name)} <span class="small">· ${clients[k].visits.length} visit(s)</span></div>`).join('');
+  sug.style.display='block';
+});
+fName.addEventListener('blur',()=>setTimeout(()=>sug.style.display='none',150));
+fName.addEventListener('change',()=>{
+  const k=fName.value.trim().toLowerCase();
+  if(clients[k]) loadClientIntoForm(k);
+});
+function pickClient(k){fName.value=clients[k].name;loadClientIntoForm(k);sug.style.display='none';}
+function loadClientIntoForm(k){
+  const c=clients[k]; if(!c)return;
+  loadedClientKey=k;
+  document.getElementById('f_phone').value=c.phone||'';
+  document.getElementById('f_hotel').value=c.hotel||'';
+  document.getElementById('foundBanner').style.display='block';
+}
+
+/* ================= SAVE (writes straight to permanent storage) ================= */
+async function saveIntake(){
+  const name=document.getElementById('f_name').value.trim();
+  if(!name){alert('Please enter the client name.');return;}
+  const key=name.toLowerCase();
+  const visit={
+    date:document.getElementById('f_date').value||new Date().toISOString().slice(0,10),
+    cif:document.getElementById('f_cif').value.trim(),
+    appt:document.getElementById('f_appt').value,
+    start:document.getElementById('f_start').value,
+    end:document.getElementById('f_end').value,
+    therapists:collectRows('therapist'),
+    services:collectRows('service'),
+    savedAt:new Date().toLocaleString()
+  };
+  if(clients[key]){
+    clients[key].phone=document.getElementById('f_phone').value.trim()||clients[key].phone;
+    clients[key].hotel=document.getElementById('f_hotel').value.trim()||clients[key].hotel;
+    clients[key].visits.push(visit);
+  }else{
+    clients[key]={name,phone:document.getElementById('f_phone').value.trim(),hotel:document.getElementById('f_hotel').value.trim(),visits:[visit]};
+  }
+  const msg=document.getElementById('saveMsg');
+  msg.textContent='Saving to shared database…';
+  try { await saveClient(key); } catch(e) { msg.textContent='⚠ Save failed: '+dbError(e); alert('The record was not confirmed saved. Check your internet connection and database permissions.'); return; }
+  msg.textContent=clients[key].visits.length===1
+    ?`✔ New client "${name}" created — saved to shared database.`
+    :`✔ Visit added to "${name}" (total: ${clients[key].visits.length}) — saved to shared database.`;
+  loadedClientKey=key;
+  resetRows();
+  setTimeout(()=>{msg.textContent=''},6000);
+}
+function resetForm(){
+  ['f_date','f_cif','f_name','f_phone','f_hotel','f_start','f_end'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('foundBanner').style.display='none';
+  document.getElementById('saveMsg').textContent='';
+  loadedClientKey=null;
+  resetRows();
+}
+
+/* ================= RECORDS VIEW ================= */
+function renderRecords(){
+  const q=document.getElementById('recSearch').value.trim().toLowerCase();
+  const keys=Object.keys(clients).filter(k=>!q||k.includes(q)).sort();
+  const rl=document.getElementById('recordList');
+  if(!keys.length){rl.innerHTML='<p class="small">No matching client records yet.</p>';return;}
+  rl.innerHTML=keys.map(k=>{
+    const c=clients[k], last=c.visits[c.visits.length-1];
+    return `<div class="rec-item" onclick="openDetail(decodeURIComponent('${encodeURIComponent(k)}'))">
+      <span class="nm">${escapeHtml(c.name)}</span>
+      <span class="meta">${c.visits.length} visit(s) · Last: ${escapeHtml(last?last.date:'—')}</span>
+    </div>`;
+  }).join('');
+}
+function openDetail(k){
+  detailKey=k;const c=clients[k];
+  document.getElementById('detailView').style.display='block';
+  document.getElementById('dName').textContent=c.name;
+  document.getElementById('dInfo').innerHTML=`📞 ${escapeHtml(c.phone||'—')} &nbsp;|&nbsp; 🏨 ${escapeHtml(c.hotel||'—')}`;
+  const vb=document.getElementById('dVisits');
+  vb.innerHTML=[...c.visits].map((v,i)=>`<tr>
+    <td>${escapeHtml(v.date)}</td><td>${escapeHtml(v.cif||'—')}</td><td>${escapeHtml(v.appt||'—')}</td>
+    <td>${escapeHtml(v.start||'—')} – ${escapeHtml(v.end||'—')}</td>
+    <td>${escapeHtml((v.therapists&&v.therapists.length)?v.therapists.join(', '):'—')}</td>
+    <td>${escapeHtml((v.services&&v.services.length)?v.services.join(', '):'—')}</td>
+    <td><button class="t-del" onclick="deleteVisit(${i})" title="Delete visit">🗑</button></td>
+  </tr>`).reverse().join('');
+  document.getElementById('detailView').scrollIntoView({behavior:'smooth'});
+}
+async function deleteVisit(i){
+  if(!confirm('Delete this visit?'))return;
+  clients[detailKey].visits.splice(i,1);
+  try { if(clients[detailKey].visits.length===0){const oldKey=detailKey;delete clients[oldKey];await removeClientFromDb(oldKey);closeDetail();} else {await saveClient(detailKey);} renderRecords();if(detailKey && clients[detailKey])openDetail(detailKey); } catch(e){ alert('Database update failed: '+dbError(e)); }
+}
+async function deleteClient(){
+  if(!confirm(`Delete client "${clients[detailKey].name}" and ALL their visits?`))return;
+  const key=detailKey; delete clients[key]; try { await removeClientFromDb(key); closeDetail();renderRecords(); } catch(e){ alert('Database delete failed: '+dbError(e)); clients=await loadClients();renderRecords(); }
+}
+function closeDetail(){detailKey=null;document.getElementById('detailView').style.display='none';}
+function addVisitToClient(){
+  const c=clients[detailKey];
+  switchTab('form');resetForm();
+  document.getElementById('f_name').value=c.name;
+  loadClientIntoForm(detailKey);
+  document.getElementById('f_date').value=new Date().toISOString().slice(0,10);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ================= BACKUP: WORD DOCUMENT (.doc) ================= */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function exportDoc(){
+  const keys=Object.keys(clients).sort();
+  if(!keys.length){alert('No client records to export yet.');return;}
+  const today=new Date().toLocaleDateString();
+  let h='';
+  h+='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">';
+  h+='<head><meta charset="utf-8"><title>Olistica Client Records</title>';
+  h+='<style>body{font-family:Georgia,serif;color:#2b2b2b}h1{color:#a8843a;letter-spacing:3px;font-size:22px}h2{color:#a8843a;font-size:16px;border-bottom:2px solid #c9a24b;padding-bottom:3px;margin-top:24px}table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:6px}th{background:#c9a24b;color:#1f1b14;padding:5px 7px;text-align:left}td{border:1px solid #d8cfbc;padding:4px 7px}</style>';
+  h+='</head><body>';
+  h+='<h1>✦ OLISTICA</h1>';
+  h+='<p><b>Nail Salon and Body Spa — Client Records Backup</b><br>Generated: '+esc(today)+' &nbsp;·&nbsp; Total clients: '+keys.length+'</p><hr>';
+  keys.forEach(k=>{
+    const c=clients[k];
+    h+='<h2>'+esc(c.name)+'</h2>';
+    h+='<p style="font-size:12px">📞 Phone: '+esc(c.phone||'—')+' &nbsp;·&nbsp; 🏨 Hotel: '+esc(c.hotel||'—')+' &nbsp;·&nbsp; Total visits: '+c.visits.length+'</p>';
+    h+='<table><tr><th>Date</th><th>CIF #</th><th>Appointment</th><th>Time</th><th>Therapist(s)</th><th>Service(s)</th></tr>';
+    [...c.visits].reverse().forEach(v=>{
+      h+='<tr><td>'+esc(v.date)+'</td><td>'+esc(v.cif||'—')+'</td><td>'+esc(v.appt||'—')+'</td><td>'+esc((v.start||'—')+' – '+(v.end||'—'))+'</td><td>'+esc((v.therapists&&v.therapists.length)?v.therapists.join(', '):'—')+'</td><td>'+esc((v.services&&v.services.length)?v.services.join(', '):'—')+'</td></tr>';
+    });
+    h+='</table>';
+  });
+  h+='</body></html>';
+  const blob=new Blob(['\ufeff'+h],{type:'application/msword'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Olistica_Client_Records_'+new Date().toISOString().slice(0,10)+'.doc';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+/* ================= BACKUP / RESTORE (JSON) ================= */
+function exportData(){
+  const blob=new Blob([JSON.stringify(clients,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='olistica_client_records_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+async function importData(ev){
+  const f=ev.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=async()=>{try{
+    const d=JSON.parse(r.result);
+    if(!d || typeof d!=='object' || Array.isArray(d)) throw new Error('Invalid backup structure');
+    if(confirm(`Restore ${Object.keys(d).length} client record(s)? This replaces current data.`)){
+      try { await replaceAllClients(d); renderRecords();alert('✔ Data restored to the shared database.'); } catch(e) { alert('Restore failed: '+dbError(e)); clients=await loadClients(); }
+    }
+  }catch(e){alert('⚠ Invalid backup file. Please use a JSON backup file (not the Word document).');}};
+  r.readAsText(f);
+  ev.target.value='';
+}
+
+/* ================= TABS ================= */
+function switchTab(v){
+  ['Form','Records'].forEach(x=>{
+    document.getElementById('view'+x).style.display=x.toLowerCase()===v?'block':'none';
+    document.getElementById('tab'+x).classList.toggle('active',x.toLowerCase()===v);
+  });
+  if(v==='records')renderRecords();
+}
+
+/* ================= INIT ================= */
+document.getElementById('f_date').value=new Date().toISOString().slice(0,10);
+document.getElementById('l_pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('l_user').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+resetRows();
+(async function init(){
+  if(!sbConfigured){document.getElementById('loginErr').textContent='Setup required: add your Supabase project URL and publishable/anon key in the script.';return;}
+  const {data:{session}}=await supabase.auth.getSession();
+  if(session?.user){currentUser=session.user;await finishLogin();}
+  supabase.auth.onAuthStateChange(async (_event,session)=>{
+    if(!session){currentUser=null;clients={};document.getElementById('appView').style.display='none';document.getElementById('hdrAuth').style.display='none';document.getElementById('loginView').style.display='block';}
+  });
+})();
+</script>
+</body>
+</html>
